@@ -1,0 +1,35 @@
+- name: create nlb
+  aws_nlb:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+    name: "{{ AWS_NLB_NAME }}"
+    state: "present"
+    region: "{{ AWS_REGION }}"
+    vpc_id: "{{ VPC_ID }}"
+    subnets:
+    #TODO: test whether this subnet is OK
+      - "{{ OCR_SERVICE_SUBNET_PUBLIC_1A.subnet.id }}"
+    listener:
+      - port: 80
+        target_groups: 
+          - name: "{{ AWS_NLB_TARGET_GROUP_NAME }}"
+            targets: 
+              - Id: 10.{{ AWS_VPC_INDEX }}.32.100
+  register: nlb_out
+  until: ('{{ nlb_out["LoadBalancers"][0]["State"]["Code"] }}' == "active")
+  retries: 10
+  delay: 100  #local test, nlb creating need about 3 seconds
+  
+- debug: var=nlb_out
+
+- name: create endpoint service
+  ec2_endpoint_service:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+    state: "present"
+    region: "{{ AWS_REGION }}"
+    nlb_arns:
+      - '{{ nlb_out["LoadBalancers"][0]["LoadBalancerArn"] }}'
+  register: eps_out
+
+- debug: var=eps_out
